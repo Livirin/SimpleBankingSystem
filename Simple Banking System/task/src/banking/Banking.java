@@ -9,17 +9,8 @@ public class Banking {
     private DataBase dataBase;
     private boolean exit;
 
-    public Banking(String fileName) {
-        try {
-            dataBase = DataBase.createSQLiteDataBase(fileName);
-            dataBase.connect();
-            dataBase.createCardTable();
-        } catch (ClassNotFoundException | SQLException e) {
-            e.printStackTrace();
-        }
-        finally {
-            dataBase.disconnect();
-        }
+    public Banking() {
+        dataBase = new DataBase();
     }
 
     public void runMainMenu() {
@@ -48,16 +39,13 @@ public class Banking {
     }
 
     public void createAccount() {
-        Card card = new Card();
+        Card card = Card.generateCard();
 
         try {
             dataBase.connect();
-            dataBase.insert(card.getNumber(), card.getPin());
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        finally {
-             dataBase.disconnect();
+            dataBase.add(card);
+        } finally {
+            dataBase.disconnect();
         }
 
         System.out.println("Your card has been created");
@@ -70,110 +58,96 @@ public class Banking {
         String cardNumber = scanner.next();
         System.out.println("Enter your PIN:");
         String PIN = scanner.next();
-        Card card = null;
 
         try {
             dataBase.connect();
-            card = dataBase.select(cardNumber);
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        finally {
-            dataBase.disconnect();
-        }
-
-        if (card != null && card.checkPin(PIN)) {
-            System.out.println("You have successfully logged in!");
-            runAccountMenu(card);
-        } else {
-            System.out.println("Wrong card number or PIN!");
-        }
-    }
-
-    public void runAccountMenu(Card card) {
-        while (true) {
-            System.out.println("1. Balance");
-            System.out.println("2. Add income");
-            System.out.println("3. Do transfer");
-            System.out.println("4. Close account");
-            System.out.println("5. Log out");
-            System.out.println("0. Exit");
-            int input = scanner.nextInt();
-            switch (input) {
-                case 1:
-                    viewBalance(card.getNumber());
-                    break;
-                case 2:
-                    addIncome(card.getNumber());
-                    break;
-                case 3:
-                    doTransfer(card.getNumber());
-                    break;
-                case 4:
-                    closeAccount(card.getNumber());
-                    break;
-                case 5:
-                    System.out.println("You have successfully logged out!");
-                    return;
-                case 0:
-                    System.out.println("Bye!");
-                    exit = true;
-                    return;
-                default:
-                    System.out.println("Wrong command! Please, try again");
-                    break;
+            Card card = dataBase.getCard(cardNumber);
+            if (card != null && card.checkPin(PIN)) {
+                System.out.println("You have successfully logged in!");
+                AccountMenu menu = new AccountMenu(card);
+                menu.run();
+            } else {
+                System.out.println("Wrong card number or PIN!");
             }
-            System.out.println();
-        }
-    }
-
-    public void viewBalance(String cardNumber) {
-        try {
-            dataBase.connect();
-            System.out.println("Balance: " + dataBase.getBalance(cardNumber));
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        finally {
+        } finally {
             dataBase.disconnect();
         }
     }
 
-    public void addIncome(String cardNumber) {
-        System.out.println("Enter income:");
-        int income = scanner.nextInt();
+    class AccountMenu {
 
-        try {
-            dataBase.connect();
-            dataBase.changeBalance(cardNumber, income);
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        finally {
-            dataBase.disconnect();
+        private Card card;
+
+        public AccountMenu(Card card) {
+            this.card = card;
         }
 
-        System.out.println("Income was added!");
-    }
-
-    public void doTransfer(String cardNumber) {
-        System.out.println("Transfer");
-        System.out.println("Enter card number:");
-        String receiverCardNumber = scanner.next();
-
-        if (!Card.isValid(receiverCardNumber)) {
-            System.out.println("Probably you made a mistake in the card number. Please try again!");
-            return;
+        public void run() {
+            while (true) {
+                System.out.println("1. Balance");
+                System.out.println("2. Add income");
+                System.out.println("3. Do transfer");
+                System.out.println("4. Close account");
+                System.out.println("5. Log out");
+                System.out.println("0. Exit");
+                int input = scanner.nextInt();
+                switch (input) {
+                    case 1:
+                        viewBalance();
+                        break;
+                    case 2:
+                        addIncome();
+                        break;
+                    case 3:
+                        doTransfer();
+                        break;
+                    case 4:
+                        closeAccount();
+                        return;
+                    case 5:
+                        System.out.println("You have successfully logged out!");
+                        return;
+                    case 0:
+                        System.out.println("Bye!");
+                        exit = true;
+                        return;
+                    default:
+                        System.out.println("Wrong command! Please, try again");
+                        break;
+                }
+                System.out.println();
+            }
         }
 
-        if (receiverCardNumber.equals(cardNumber)){
-            System.out.println("You can't transfer money to the same account!");
-            return;
+        public void viewBalance() {
+            System.out.println("Balance: " + card.getBalance());
         }
 
-        try {
-            dataBase.connect();
-            if (dataBase.select(receiverCardNumber) == null) {
+        public void addIncome() {
+            System.out.println("Enter income:");
+            int income = scanner.nextInt();
+            dataBase.changeBalance(card, income);
+            System.out.println("Income was added!");
+        }
+
+        public void doTransfer() {
+            System.out.println("Transfer");
+            System.out.println("Enter card number:");
+            String receiverCardNumber = scanner.next();
+
+            if (!LuhnAlgorithm.isValid(receiverCardNumber)) {
+                System.out.println("Probably you made a mistake in the card number. Please try again!");
+                return;
+            }
+
+            if (receiverCardNumber.equals(card.getNumber())){
+                System.out.println("You can't transfer money to the same account!");
+                return;
+            }
+
+            Card receiverCard = dataBase.getCard(receiverCardNumber);
+
+            if (receiverCard == null) {
                 System.out.println("Such a card does not exist.");
                 return;
             }
@@ -181,31 +155,17 @@ public class Banking {
             System.out.println("Enter how much money you want to transfer:");
             int transfer = scanner.nextInt();
 
-            if (dataBase.getBalance(cardNumber) < transfer) {
+            if (card.getBalance() < transfer) {
                 System.out.println("Not enough money!");
                 return;
             }
 
-            dataBase.transfer(cardNumber, receiverCardNumber, transfer);
+            dataBase.transfer(card, receiverCard, transfer);
             System.out.println("Success!");
+        }
 
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        finally {
-            dataBase.disconnect();
-        }
-    }
-
-    public void closeAccount(String cardNumber) {
-        try {
-            dataBase.connect();
-            dataBase.delete(cardNumber);
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        finally {
-            dataBase.disconnect();
+        public void closeAccount() {
+            dataBase.delete(card);
         }
     }
 

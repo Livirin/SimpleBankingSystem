@@ -1,92 +1,67 @@
 package banking;
 
-import java.sql.*;
+import org.hibernate.HibernateException;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.cfg.Configuration;
+
+import java.util.List;
 
 public class DataBase {
 
-    private String url;
-    private Connection connection;
-    private Statement statement;
+    private static SessionFactory factory;
+    private Session session;
 
-    private DataBase(String url) {
-        this.url = url;
+    public static void createSessionFactory(String configFile, String url) throws HibernateException {
+        factory = new Configuration().configure(configFile).setProperty("hibernate.connection.url", url).addAnnotatedClass(Card.class).buildSessionFactory();
     }
 
-    public static DataBase createSQLiteDataBase(String fileName) throws ClassNotFoundException {
-        try {
-            Class.forName("org.sqlite.JDBC");
-        } catch (ClassNotFoundException e) {
-            throw new ClassNotFoundException("Not found sqlite driver");
+    public static void closeSessionFactory() {
+        if (factory != null) {
+            factory.close();
         }
-        return new DataBase("jdbc:sqlite:" + fileName);
     }
 
-    public void connect() throws SQLException {
-        try {
-            connection = DriverManager.getConnection(url);
-            statement = connection.createStatement();
-        } catch (SQLException e) {
-            throw new SQLException("Unable to connect");
-        }
+    public void connect() {
+        session = factory.openSession();
     }
 
     public void disconnect() {
-        try {
-            statement.close();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        try {
-            connection.close();
-        } catch (SQLException e) {
-            e.printStackTrace();
+        if (session != null) {
+            session.close();
         }
     }
 
-    public void createCardTable() throws SQLException {
-        statement.executeUpdate("CREATE TABLE IF NOT EXISTS card(" +
-                "id INTEGER PRIMARY KEY," +
-                "number TEXT NOT NULL UNIQUE," +
-                "pin TEXT NOT NULL," +
-                "balance INTEGER DEFAULT 0)");
-    }
-
-    public Card select(String cardNumber) throws SQLException {
-        Card card = null;
-        ResultSet resultSet = statement.executeQuery(String.format("SELECT * FROM card WHERE number = '%s';", cardNumber));
-        while (resultSet.next()) {
-            card = new Card(resultSet.getString("number"), resultSet.getString("pin"), resultSet.getInt("balance"));
+    public Card getCard(String cardNumber) {
+        List<Card> cards = session.createQuery("FROM Card WHERE number = " + cardNumber).getResultList();
+        if (!cards.isEmpty()) {
+            return cards.get(0);
+        } else {
+            return null;
         }
-        return card;
     }
 
-    public int getBalance(String cardNumber) throws SQLException {
-        int balance = 0;
-        ResultSet resultSet = statement.executeQuery(String.format("SELECT * FROM card WHERE number = '%s';", cardNumber));
-        while (resultSet.next()) {
-            balance = resultSet.getInt("balance");
-        }
-        return balance;
+    public void add(Card card) {
+        session.beginTransaction();
+        session.save(card);
+        session.getTransaction().commit();
     }
 
-    public void insert(String cardNumber, String cardPin) throws SQLException {
-        statement.executeUpdate(String.format("INSERT INTO card (number, pin) VALUES ('%s', '%s');", cardNumber, cardPin));
+    public void changeBalance(Card card, int amount) {
+        card.setBalance(card.getBalance() + amount);
+        session.save(card);
     }
 
-    public void changeBalance(String cardNumber, int amount) throws SQLException {
-        statement.executeUpdate(String.format("UPDATE card SET balance = balance + %d WHERE number = '%s';", amount, cardNumber));
+    public void transfer(Card senderCard, Card receiverCard, int amount) {
+        session.beginTransaction();
+        changeBalance(senderCard, -1 * amount);
+        changeBalance(receiverCard, amount);
+        session.getTransaction().commit();
     }
 
-    public void transfer(String cardNumber, String receiverCardNumber, int amount) throws SQLException {
-        connection.setAutoCommit(false);
-        changeBalance(cardNumber, -1 * amount);
-        changeBalance(receiverCardNumber, amount);
-        connection.commit();
-        connection.setAutoCommit(true);
-    }
-
-    public void delete(String cardNumber) throws SQLException {
-        statement.executeUpdate("DELETE FROM card WHERE number = " + cardNumber + ";");
-        System.out.println("The account has been closed!");
+    public void delete(Card card)  {
+        session.beginTransaction();
+        session.delete(card);
+        session.getTransaction().commit();
     }
 }

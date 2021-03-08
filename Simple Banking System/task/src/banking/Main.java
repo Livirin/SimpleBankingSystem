@@ -1,5 +1,7 @@
 package banking;
 
+import org.hibernate.HibernateException;
+
 public class Main {
 
     public static void main(String[] args) {
@@ -7,9 +9,17 @@ public class Main {
         if (args.length > 1 && "-fileName".equals(args[0])) {
                 fileName = args[1];
         } else {
-            fileName = "banking.db";
+            fileName = "Simple Banking System/task/banking.db";
         }
-        Banking banking = new Banking(fileName);
-        banking.runMainMenu();
+        try {
+            DataBase.createSessionFactory("hibernate.cfg.xml", "jdbc:sqlite:" + fileName);
+            Banking banking = new Banking();
+            banking.runMainMenu();
+        } catch (HibernateException e) {
+            e.printStackTrace();
+        }
+        finally {
+            DataBase.closeSessionFactory();
+        }
     }
 }
