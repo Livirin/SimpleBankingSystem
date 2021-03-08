@@ -1,6 +1,5 @@
 package banking;
 
-import java.sql.SQLException;
 import java.util.Scanner;
 
 public class Banking {
