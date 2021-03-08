@@ -5,8 +5,11 @@ In this project we:
 - log into account by entering its card information. There we can check card balance, add income, transfer money to another card and delete the account.
 System interactions are performed in the terminal.
 ***
+Used Hibernate for work with database.
+***
 Project structure:
-- Card is responsible for generate card information;
+- Card is mapping by card table from database;
+- LuhnAlgorithm contains static methods for calculations using Luhn Algorithm;
 - DataBase is responsible for interaction with the database;
 - Banking is responsible for interaction with clients.
 ***
