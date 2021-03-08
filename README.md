@@ -1,9 +1,12 @@
 # SimpleBankingSystem
-Solving the project Simple Banking System from <https://hyperskill.org> (JetBrains Academy).    
+Solving the project Simple Banking System from <https://hyperskill.org> (JetBrains Academy). 
+***
 In this project we:
 - create the account by generating card number (using Luhn algorithm) and PIN code and save data to database;
 - log into account by entering its card information. There we can check card balance, add income, transfer money to another card and delete the account.
 System interactions are performed in the terminal.
+***
+Database connection is implemented by JDBC.
 ***
 Project structure:
 - Card is responsible for generate card information;
